@@ -136,6 +136,36 @@ describe('CilUtils', () => {
       assert.equal(tx.outputs.length, nOutputs + 1);
     });
 
+    it('should createTxWithFunds (MAX amount)', async () => {
+      const amount = 499986000;
+      const nOutputs = 1;
+      const arrCoins = [
+        {
+          "hash": "13252b7f61784f4d45740c38b4bbf15629e066b198c70b54a05af6f006b5b6c2",
+          "nOut": 1,
+          "amount": amount,
+          "isStable": true
+        },
+        {
+          "hash": "21e8bdbee170964d36fcabe4e071bc14933551b9c2b031770ce73ba973bc4dd7",
+          "nOut": 1,
+          "amount": amount,
+          "isStable": true
+        }];
+
+      const tx = await utils.createTxWithFunds({
+        arrCoins,
+        gatheredAmount: arrCoins.reduce((accum, current) => accum += current.amount, 0),
+        receiverAddr: 'Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86',
+        amount: -1
+      });
+
+      assert.isOk(tx);
+      assert.equal(tx.inputs.length, 2);
+      assert.equal(tx.outputs.length, nOutputs);
+      assert.equal(tx.amountOut(), 2*amount - utils._estimateTxFee(2, 1, true));
+    });
+
     it('should createTxWithFunds (two receivers and change)', async () => {
       const amount = 1e4;
       const nOutputs = 2;
