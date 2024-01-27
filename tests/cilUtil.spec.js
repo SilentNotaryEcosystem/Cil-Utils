@@ -103,7 +103,7 @@ describe('CilUtils', () => {
 
   });
 
-  describe('createSendCoinsTx', () => {
+  describe('createSendCoinsTx & createTxWithFunds', () => {
 
     it('should createTxWithFunds (two input and change)', async () => {
       const amount = 499986000;
@@ -136,7 +136,7 @@ describe('CilUtils', () => {
       assert.equal(tx.outputs.length, nOutputs + 1);
     });
 
-    it('should createTxWithFunds (MAX amount)', async () => {
+    it('should createTxWithFunds (MAX amount, 3 inputs)', async () => {
       const amount = 499986000;
       const nOutputs = 1;
       const arrCoins = [
@@ -151,6 +151,12 @@ describe('CilUtils', () => {
           "nOut": 1,
           "amount": amount,
           "isStable": true
+        },
+        {
+          "hash": "21e8bdbee170964d36fcabe4e071bc14933551b9c2b031770ce73ba973bc4dd7",
+          "nOut": 3,
+          "amount": amount,
+          "isStable": true
         }];
 
       const tx = await utils.createTxWithFunds({
@@ -161,9 +167,32 @@ describe('CilUtils', () => {
       });
 
       assert.isOk(tx);
-      assert.equal(tx.inputs.length, 2);
+      assert.equal(tx.inputs.length, 3);
       assert.equal(tx.outputs.length, nOutputs);
-      assert.equal(tx.amountOut(), 2*amount - utils._estimateTxFee(2, 1, true));
+      assert.equal(tx.amountOut(), 3*amount - utils._estimateTxFee(3, 1, true));
+    });
+
+    it('should createTxWithFunds (MAX amount, 1 input)', async () => {
+      const amount = 499986000;
+      const nOutputs = 1;
+      const arrCoins = [
+        {
+          "hash": "13252b7f61784f4d45740c38b4bbf15629e066b198c70b54a05af6f006b5b6c2",
+          "nOut": 1,
+          "amount": amount,
+          "isStable": true
+        }];
+
+      const tx = await utils.createTxWithFunds({
+        arrCoins,
+        receiverAddr: 'Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86',
+        amount: -1
+      });
+
+      assert.isOk(tx);
+      assert.equal(tx.inputs.length, 1);
+      assert.equal(tx.outputs.length, nOutputs);
+      assert.equal(tx.amountOut(), amount - utils._estimateTxFee(1, 1, true));
     });
 
     it('should createTxWithFunds (two receivers and change)', async () => {
@@ -303,6 +332,58 @@ describe('CilUtils', () => {
       assert.isOk(tx);
       assert.equal(tx.inputs.length, 2);
       assert.equal(tx.outputs.length, 3);
+    });
+
+    it('should createSendCoinsTx (MAX)', async () => {
+      const amount = 1e5;
+      const arrCoins = [
+        {
+          "hash": "13252b7f61784f4d45740c38b4bbf15629e066b198c70b54a05af6f006b5b6c2",
+          "nOut": 1,
+          "amount": amount,
+          "isStable": true
+        },
+        {
+          "hash": "21e8bdbee170964d36fcabe4e071bc14933551b9c2b031770ce73ba973bc4dd7",
+          "nOut": 1,
+          "amount": amount,
+          "isStable": true
+        }];
+
+      utils.queryApi = sinon.fake.resolves(arrCoins);
+
+      const tx = await utils.createSendCoinsTx([
+          ['Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86', -1],
+        ]
+      );
+
+      assert.isOk(tx);
+      assert.equal(tx.inputs.length, 2);
+      assert.equal(tx.outputs.length, 1);
+      assert.equal(tx.amountOut(), 2*amount-utils._estimateTxFee(2,1,true));
+    });
+
+    it('should createSendCoinsTx (MAX, 1 input)', async () => {
+      const amount = 1e7;
+      const arrCoins = [
+        {
+          "hash": "13252b7f61784f4d45740c38b4bbf15629e066b198c70b54a05af6f006b5b6c2",
+          "nOut": 1,
+          "amount": amount,
+          "isStable": true
+        }];
+
+      utils.queryApi = sinon.fake.resolves(arrCoins);
+
+      const tx = await utils.createSendCoinsTx([
+          ['Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86', -1],
+        ]
+      );
+
+      assert.isOk(tx);
+      assert.equal(tx.inputs.length, 1);
+      assert.equal(tx.outputs.length, 1);
+      assert.equal(tx.amountOut(), amount-utils._estimateTxFee(1,1,true));
     });
 
     it('should createSendTokenTx', async () => {

@@ -198,13 +198,7 @@ class CilUtils {
     }
 
     // for single PK scenario it's allowed to use single claimProof in txSignature
-    if (tx.inputs.length > 1) {
-      tx.signForContract(this._kpFunds.privateKey);
-    } else {
-      for (let i in tx.inputs) {
-        tx.claim(parseInt(i), this._kpFunds.privateKey);
-      }
-    }
+    tx.signForContract(this._kpFunds.privateKey);
 
     return tx;
   }
