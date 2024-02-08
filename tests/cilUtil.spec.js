@@ -92,7 +92,7 @@ describe('CilUtils', () => {
     });
 
     it('should use one utxo (fee)', async () => {
-      const {arrCoins, gathered} = utils.gatherInputsForAmount(arrUtxos, amount -1 - utils._estimateTxFee(1, 2));
+      const {arrCoins, gathered} = utils.gatherInputsForAmount(arrUtxos, amount - 1 - utils._estimateTxFee(1, 2));
 
       assert.equal(arrCoins.length, 1);
     });
@@ -102,6 +102,37 @@ describe('CilUtils', () => {
     });
 
   });
+
+  it('should properly calc change', async () => {
+    const amount = 4000;
+    const arrUtxos = [
+      {
+        "hash": "13252b7f61784f4d45740c38b4bbf15629e066b198c70b54a05af6f006b5b6c2",
+        "nOut": 1054,
+        "amount": amount,
+        "isStable": true
+      },
+      {
+        "hash": "21e8bdbee170964d36fcabe4e071bc14933551b9c2b031770ce73ba973bc4dd7",
+        "nOut": 20,
+        "amount": amount,
+        "isStable": true
+      }];
+
+    utils.getUtxos = sinon.fake.resolves(arrUtxos);
+
+    const tx = await utils.createSendCoinsTx([
+      ['a'.repeat(40), parseInt(amount / 4)],
+      ['b'.repeat(40), parseInt(amount / 4)]
+    ]);
+
+    assert.equal(tx.inputs.length, 1);
+    assert.equal(tx.outputs.length, 3);
+    assert.equal(utils._getTransferFee(), 4000);
+    const txCost = utils._estimateTxFee(1, 3, true);
+    assert.equal(tx.outputs[2].amount, amount - 2 * parseInt(amount / 4) - txCost);
+  });
+
 
   describe('createSendCoinsTx & createTxWithFunds', () => {
 
@@ -169,7 +200,7 @@ describe('CilUtils', () => {
       assert.isOk(tx);
       assert.equal(tx.inputs.length, 3);
       assert.equal(tx.outputs.length, nOutputs);
-      assert.equal(tx.amountOut(), 3*amount - utils._estimateTxFee(3, 1, true));
+      assert.equal(tx.amountOut(), 3 * amount - utils._estimateTxFee(3, 1, true));
     });
 
     it('should createTxWithFunds (MAX amount, 1 input)', async () => {
@@ -292,7 +323,7 @@ describe('CilUtils', () => {
         // nOutputs will be ignored in sweep scenario
         nOutputs: 10,
         arrReceivers: [
-          ['Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86', -1],
+          ['Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86', -1]
         ]
       });
 
@@ -353,14 +384,14 @@ describe('CilUtils', () => {
       utils.queryApi = sinon.fake.resolves(arrCoins);
 
       const tx = await utils.createSendCoinsTx([
-          ['Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86', -1],
+          ['Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86', -1]
         ]
       );
 
       assert.isOk(tx);
       assert.equal(tx.inputs.length, 2);
       assert.equal(tx.outputs.length, 1);
-      assert.equal(tx.amountOut(), 2*amount-utils._estimateTxFee(2,1,true));
+      assert.equal(tx.amountOut(), 2 * amount - utils._estimateTxFee(2, 1, true));
     });
 
     it('should createSendCoinsTx (MAX, 1 input)', async () => {
@@ -376,15 +407,18 @@ describe('CilUtils', () => {
       utils.queryApi = sinon.fake.resolves(arrCoins);
 
       const tx = await utils.createSendCoinsTx([
-          ['Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86', -1],
+          ['Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86', -1]
         ]
       );
 
       assert.isOk(tx);
       assert.equal(tx.inputs.length, 1);
       assert.equal(tx.outputs.length, 1);
-      assert.equal(tx.amountOut(), amount-utils._estimateTxFee(1,1,true));
+      assert.equal(tx.amountOut(), amount - utils._estimateTxFee(1, 1, true));
     });
+  });
+
+  describe('createSendTokenTx', () => {
 
     it('should createSendTokenTx', async () => {
       const amount = 1e5;
@@ -416,35 +450,58 @@ describe('CilUtils', () => {
       assert.equal(tx.outputs.length, 1);
     });
 
-    it('should properly calc change', async () => {
-      const amount = 4000;
-      const arrUtxos = [
-          {
-            "hash": "13252b7f61784f4d45740c38b4bbf15629e066b198c70b54a05af6f006b5b6c2",
-            "nOut": 1054,
-            "amount": amount,
-            "isStable": true
-          },
-          {
-            "hash": "21e8bdbee170964d36fcabe4e071bc14933551b9c2b031770ce73ba973bc4dd7",
-            "nOut": 20,
-            "amount": amount,
-            "isStable": true
-          }];
+    it('should createSendTokenTx (1 input)', async () => {
+      const arrCoins = [
+        {
+          "hash": "5bff97cd47bf151972f46f597ba2e568a9e985cf1435e25511963068141f84af",
+          "nOut": 0,
+          "amount": 85092,
+          "isStable": true
+        }];
 
-      utils.getUtxos=sinon.fake.resolves(arrUtxos);
+      utils.queryApi = sinon.fake.resolves(arrCoins);
 
-      const tx = await utils.createSendCoinsTx([
-        ['a'.repeat(40), parseInt(amount/4)],
-        ['b'.repeat(40), parseInt(amount/4)],
-      ]);
+      const tx = await utils.createSendTokenTx(
+        'Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86',
+        20,
+        'TST',
+        'Ux1114cfe96bd4e2a3df3d5115b75557b9f05d4b86'
+      );
 
+      assert.isOk(tx);
       assert.equal(tx.inputs.length, 1);
-      assert.equal(tx.outputs.length, 3);
-      assert.equal(utils._getTransferFee(), 4000);
-      const txCost = utils._estimateTxFee(1, 3, true);
-      assert.equal(tx.outputs[2].amount, amount - 2*parseInt(amount/4) - txCost);
+      assert.equal(tx.outputs.length, 1);
     });
+
+    it('should throw (not enough coins. nFeeInvoke)', async () => {
+      utils = new CilUtils({
+        privateKey: 'a'.repeat(64),
+        nFeeInvoke: 1e5,
+        nFeePerInputOutput: 250,
+        nFeeDeploy: 1e4,
+        rpcPort: 18222,
+        rpcAddress: 'localhost',
+        apiUrl: 'dummy'
+      });
+
+      const arrCoins = [
+        {
+          "hash": "5bff97cd47bf151972f46f597ba2e568a9e985cf1435e25511963068141f84af",
+          "nOut": 0,
+          "amount": 85092,
+          "isStable": true
+        }];
+
+      utils.queryApi = sinon.fake.resolves(arrCoins);
+
+      return assert.isRejected(utils.createSendTokenTx(
+        'Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86',
+        20,
+        'TST',
+        'Ux1114cfe96bd4e2a3df3d5115b75557b9f05d4b86'
+      ));
+    });
+
   });
 
   describe('waitTxDone', async () => {
@@ -591,7 +648,6 @@ describe('CilUtils', () => {
     });
   });
 
-
 //  it('should createTxInvokeContract', async () => {
 //    utils.queryApi = sinon.fake.resolves([
 //      {
@@ -657,7 +713,7 @@ describe('CilUtils', () => {
         rpcPass: 'superpassword'
       });
       await didUtils.asyncLoaded();
-    })
+    });
 
     it('addProvider', async () => {
 
@@ -676,7 +732,7 @@ describe('CilUtils', () => {
         }];
       const ownAddress = '0d5ab318f38a8e4faed56d625a677ba481c9022b';
 
-      sinon.stub(didUtils._kpFunds, 'address').value(ownAddress)
+      sinon.stub(didUtils._kpFunds, 'address').value(ownAddress);
       didUtils.queryApi = sinon.fake.resolves(fakeUtxos);
 
       const tx = await didUtils.performDIDOperation(
@@ -690,11 +746,11 @@ describe('CilUtils', () => {
 
       assert.isOk(tx);
       assert.equal(tx.inputs.length, 1);
-      assert.oneOf(tx.inputs[0].txHash.toString('hex'), fakeUtxos.map(({ hash }) => hash));
+      assert.oneOf(tx.inputs[0].txHash.toString('hex'), fakeUtxos.map(({hash}) => hash));
       assert.equal(tx.outputs.length, 2);
       assert.match(tx.outputs[0].contractCode, /addProvider/); // contract calling
       assert.equal(tx.outputs[1].receiverAddr.toString('hex'), ownAddress); // change
-    })
+    });
     it('create', async () => {
       const fakeUtxos = [
         {
@@ -711,7 +767,7 @@ describe('CilUtils', () => {
         }];
       const ownAddress = '0d5ab318f38a8e4faed56d625a677ba481c9022b';
 
-      sinon.stub(didUtils._kpFunds, 'address').value(ownAddress)
+      sinon.stub(didUtils._kpFunds, 'address').value(ownAddress);
       didUtils.queryApi = sinon.fake.resolves(fakeUtxos);
 
       const tx = await didUtils.performDIDOperation(
@@ -725,11 +781,11 @@ describe('CilUtils', () => {
 
       assert.isOk(tx);
       assert.equal(tx.inputs.length, 1);
-      assert.oneOf(tx.inputs[0].txHash.toString('hex'), fakeUtxos.map(({ hash }) => hash));
+      assert.oneOf(tx.inputs[0].txHash.toString('hex'), fakeUtxos.map(({hash}) => hash));
       assert.equal(tx.outputs.length, 2);
       assert.match(tx.outputs[0].contractCode, /create.*tw.*trueshura.*8ea0/); // contract calling
       assert.equal(tx.outputs[1].receiverAddr.toString('hex'), ownAddress); // change
-    })
-  })
+    });
+  });
 
 });
