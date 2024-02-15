@@ -336,6 +336,64 @@ describe('CilUtils', () => {
       console.log(2 * amount - utils._estimateTxFee(2, 1, true));
     });
 
+  it("should createTxWithFunds (3 receivers with CHANGE money to send who have -1 out amount.)", async () => {
+
+    const amount = 1e4;
+    const nOutputs = 2;
+    const nManualFee = 500;
+    const extraMoney = 800; // EXTRA MONEY TO SEND  who have amount -1 but minus Fee.
+    // change will be 300 ( because - fee)
+    const arrCoins = [
+      {
+        hash: "13252b7f61784f4d45740c38b4bbf15629e066b198c70b54a05af6f006b5b6c2",
+        nOut: 1,
+        amount: amount,
+        isStable: true,
+      },
+      {
+        hash: "21e8bdbee170964d36fcabe4e071bc14933551b9c2b031770ce73ba973bc4dd7",
+        nOut: 1,
+        amount: amount + extraMoney, // + extraMoney to have change
+        isStable: true,
+      },
+    ];
+    let gatheredAmount = arrCoins.reduce(
+      (accum, current) => accum + current.amount,
+      0
+    )
+    const txData = {
+      arrCoins,
+      gatheredAmount,
+      nOutputs,
+      manualFee: nManualFee,
+      arrReceivers: [
+        ["Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86", amount],
+        ["Ux00c4cfe96bd4e2a3df3d5115b75557b9f05d4b00", amount],
+        ["Ux61444f741e630ab6284177eb727d2887dc29a922", -1], // -1 to send left coins : change
+      ],
+    };
+
+    let arrReceiversPositive = txData.arrReceivers.filter(item => item[1] > 0); // получаем массив получателей у которых amount > 0
+    let arrReceiversNegative = txData.arrReceivers.filter(item => item[1] <= 0); // получаем массив получателей у которых amount <= 0
+
+    const tx = await utils.createTxWithFunds(txData);
+    let nTotalSent = arrReceiversPositive.reduce(
+      (accum, current) => accum + current[1],
+      0
+    );
+    // this is for check tx.outputs.length (if no change, it will be less than arrReceivers.length)
+    let fee = utils._estimateTxFee(arrCoins.length, arrReceiversPositive.length * nOutputs + arrReceiversNegative.length, true)
+    let change = gatheredAmount - nTotalSent - (nManualFee ? nManualFee : fee);
+    if(change < 0)
+      change = 0;
+
+    assert.isOk(tx);
+    assert.equal(tx.inputs.length, arrCoins.length);
+    assert.equal(tx.outputs.length, arrReceiversPositive.length * nOutputs + arrReceiversNegative.length - (change ? 0 : 1));
+    assert.equal(tx.amountOut(), arrCoins.length * amount + extraMoney - nManualFee);
+
+  });
+
     it('should createSendCoinsTx (two receivers + change)', async () => {
       const amount = 1e5;
       const arrCoins = [
