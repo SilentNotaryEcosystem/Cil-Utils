@@ -10,7 +10,6 @@ chai.use(chaiProm);
 const {assert} = chai;
 
 let utils;
-console.log('describe', typeof(describe))
 
 describe('CilUtils', () => {
   before(async function() {
