@@ -81,7 +81,7 @@ class CilUtils {
     const objResult = arrResult.find(objRecord => objRecord.symbol === strToken);
     return objResult ? parseFloat(objResult.balance) : NaN;
   }
-
+  
   /**
    * Bundled version for send coins
    *
@@ -89,11 +89,21 @@ class CilUtils {
    * @param {Number} nConciliumId
    * @returns {Promise<Transaction>} You can send it via sendTx
    */
-  async createSendCoinsTx(arrReceivers, nConciliumId = 1) {
+   async createSendCoinsTx(arrReceivers, nConciliumId = 1) {
     const nTotalToSend = arrReceivers.reduce((accum, [, nAmountToSend]) => accum + nAmountToSend, 0);
     const arrUtxos = await this.getUtxos();
+    const sum = arrUtxos.reduce((acc, item) =>{
+      return acc + item.amount;
+    }, 0);
+    let change = 0
+    const fee = this._estimateTxFee(arrUtxos.length, arrReceivers.length, true)
+    if(arrReceivers[arrReceivers.length - 1 ][1] === -1) {
+      change = sum - nTotalToSend - fee
+    }
+    
     const {arrCoins, gathered} = nTotalToSend < 0 ? ({arrCoins: arrUtxos, gathered: undefined}) :
-      await this.gatherInputsForAmount(arrUtxos, nTotalToSend);
+      await this.gatherInputsForAmount(arrUtxos, nTotalToSend + change);
+    
     const tx = await this.createTxWithFunds({
       arrReceivers,
       nConciliumId,
@@ -104,6 +114,7 @@ class CilUtils {
 
     return tx;
   }
+  
 
   /**
    *
@@ -155,7 +166,6 @@ class CilUtils {
                             nConciliumId
                           }) {
     await this._loadedPromise;
-
     if (!arrReceivers) {
       arrReceivers = [[strAddress, nAmountToSend]];
     }
@@ -175,12 +185,16 @@ class CilUtils {
     await this._addInputs(tx, arrCoins);
 
     for (let [strAddr, nAmount] of arrReceivers) {
-      nTotalSent += nAmount;
-      strAddr = this.stripAddressPrefix(strAddr);
+      // if nAmount -1 then skip hire and send him all change later if have left.
+      if (nAmount !== -1) {
 
-      // разобьем сумму на numOfOutputs выходов, чтобы не блокировало переводы
-      for (let i = 0; i < numOfOutputs; i++) {
-        tx.addReceiver(parseInt(nAmount / numOfOutputs), Buffer.from(strAddr, 'hex'));
+        nTotalSent += nAmount;
+        strAddr = this.stripAddressPrefix(strAddr);
+
+        // разобьем сумму на numOfOutputs выходов, чтобы не блокировало переводы
+        for (let i = 0; i < numOfOutputs; i++) { 
+          tx.addReceiver(nAmount / numOfOutputs, Buffer.from(strAddr, 'hex'));
+        }
       }
     }
 
@@ -194,9 +208,16 @@ class CilUtils {
       fee = this._estimateTxFee(tx.inputs.length, tx.outputs.length + 1, true);
       change = gatheredAmount - nTotalSent - (manualFee ? manualFee : fee);
 
-      if (change > 0) tx.addReceiver(change, Buffer.from(this._kpFunds.address, 'hex'));
+      if (change > 0) {
+        // send change
+        if(arrReceivers[arrReceivers.length - 1][1] === -1) {
+          tx.addReceiver(change, Buffer.from(arrReceivers[arrReceivers.length - 1][0], 'hex'));
+        }
+        else {
+          tx.addReceiver(change, Buffer.from(this._kpFunds.address, 'hex'));
+        }
+      }
     }
-
     // for single PK scenario it's allowed to use single claimProof in txSignature
     tx.signForContract(this._kpFunds.privateKey);
 
@@ -217,7 +238,7 @@ class CilUtils {
     if (bBigFirst) {
       arrUtxos = arrUtxos.sort((a, b) => b.amount - a.amount);
     }
-
+    
     for (let coins of arrUtxos) {
       if (!coins.amount) continue;
       gathered += coins.amount;
@@ -225,7 +246,7 @@ class CilUtils {
       if (bUseOnlyOne) {
         const fee = this._estimateTxFee(1, 2, true);
         if (coins.amount > amount + fee) return {arrCoins: [coins], gathered: coins.amount, skip: arrCoins.length};
-      } else if (gathered > amount + this._estimateTxFee(arrCoins.length, 2, true)) {
+      } else if (gathered > amount + this._estimateTxFee(arrCoins.length, arrUtxos.length, true)) {
         return {
           arrCoins,
           gathered
