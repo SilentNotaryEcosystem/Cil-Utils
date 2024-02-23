@@ -10,6 +10,7 @@ chai.use(chaiProm);
 const {assert} = chai;
 
 let utils;
+console.log('describe', typeof(describe))
 
 describe('CilUtils', () => {
   before(async function() {
@@ -473,6 +474,37 @@ describe('CilUtils', () => {
       assert.equal(tx.inputs.length, 1);
       assert.equal(tx.outputs.length, 1);
       assert.equal(tx.amountOut(), amount - utils._estimateTxFee(1, 1, true));
+    });
+
+    it("should createSendCoinsTx (3 receivers with CHANGE money to send who have -1 out amount.)", async () => {
+
+      const amount = 1e4;
+      const arrCoins = [
+        {
+          hash: "13252b7f61784f4d45740c38b4bbf15629e066b198c70b54a05af6f006b5b6c2",
+          nOut: 1,
+          amount,
+          isStable: true,
+        },
+        {
+          hash: "21e8bdbee170964d36fcabe4e071bc14933551b9c2b031770ce73ba973bc4dd7",
+          nOut: 1,
+          amount,
+          isStable: true,
+        },
+      ];
+
+      const arrReceivers = [
+          ["Ux1ac4cfe96bd4e2a3df3d5115b75557b9f05d4b86", amount/3],
+          ["Ux00c4cfe96bd4e2a3df3d5115b75557b9f05d4b00", amount/3],
+          ["Ux61444f741e630ab6284177eb727d2887dc29a922", -1], // -1 to send left coins : change
+      ];
+      utils.getUtxos=sinon.fake.resolves(arrCoins);
+
+      const tx = await utils.createSendCoinsTx(arrReceivers);
+      assert.equal(tx.outputs.length, 3);
+      let fee = utils._estimateTxFee(tx.inputs.length, tx.outputs.length, true);
+      assert.equal(tx.amountOut(), arrCoins.length * amount - fee);
     });
   });
 
