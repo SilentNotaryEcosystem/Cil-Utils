@@ -1,15 +1,15 @@
-const { Root } = require("protobufjs/dist/light/protobuf.min");
 const Buffer = require("buffer/").Buffer;
-const jsonDescriptor = require("./structures.json");
+const protobufRoot = require("./structures");
 const Crypto = require("crypto-web");
 const Coins = require("./coins");
 const {assert} = require('./misc');
 
 const CURRENT_TX_VERSION = 1;
 const MAX_BLOCK_SIZE = 1024 * 1024;
-const root = Root.fromJSON(jsonDescriptor);
-const transactionProto = root.lookup('Transaction');
-const transactionPayloadProto = root.lookup('TransactionPayload');
+//const transactionProto = protobufRoot.lookup('Transaction');
+const transactionProto = protobufRoot.structures.Transaction;
+//const transactionPayloadProto = protobufRoot.lookup('TransactionPayload');
+const transactionPayloadProto = protobufRoot.structures.TransactionPayload;
 
 class Transaction {
     constructor(data) {
