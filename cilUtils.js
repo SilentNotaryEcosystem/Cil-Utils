@@ -10,7 +10,6 @@ const sleep = (delay) => {
   });
 };
 
-
 const NUM_OF_OUTPUTS = 20;
 
 class CilUtils {
@@ -36,16 +35,16 @@ class CilUtils {
     this._kpFunds = factory.Crypto.keyPairFromPrivate(privateKey);
 
     this._loadedPromise = factory.asyncLoad()
-        .then(_ => {
-          this._nFeeDeploy = nFeeDeploy || factory.Constants.fees.CONTRACT_CREATION_FEE;
-          this._nFeeInvoke = nFeeInvoke || factory.Constants.fees.CONTRACT_INVOCATION_FEE;
-          this._nFeePerInputOutput = nFeePerInputOutput || factory.Constants.fees.TX_FEE * 0.12;
-          this._nFeePerInputNoSign = factory.Constants.fees.TX_FEE * 0.04;
-        })
-        .catch(err => {
-          console.error(err);
-          process.exit(1);
-        });
+      .then(_ => {
+        this._nFeeDeploy = nFeeDeploy || factory.Constants.fees.CONTRACT_CREATION_FEE;
+        this._nFeeInvoke = nFeeInvoke || factory.Constants.fees.CONTRACT_INVOCATION_FEE;
+        this._nFeePerInputOutput = nFeePerInputOutput || factory.Constants.fees.TX_FEE * 0.12;
+        this._nFeePerInputNoSign = factory.Constants.fees.TX_FEE * 0.04;
+      })
+      .catch(err => {
+        console.error(err);
+        process.exit(1);
+      });
 
     this._apiUrl = apiUrl;
   }
@@ -76,7 +75,7 @@ class CilUtils {
     const strAddrToQuery = strAddr || this._kpFunds.address;
 
     const arrResult = await this.queryApi('Token/Balances', strAddrToQuery);
-    if(!strToken) return arrResult;
+    if (!strToken) return arrResult;
 
     const objResult = arrResult.find(objRecord => objRecord.symbol === strToken);
     return objResult ? parseFloat(objResult.balance) : NaN;
@@ -101,7 +100,9 @@ class CilUtils {
     const arrUtxos = await this.getUtxos();
     const {arrCoins, gathered} = bSweep ?
       ({arrCoins: arrUtxos}) :
-      await this.gatherInputsForAmount(arrUtxos, nTotalToSend);
+      await this.gatherInputsForAmount(arrUtxos, nTotalToSend, false, false,
+        bSweep ? arrReceivers.length : arrReceivers.length + 1
+      );
 
     const tx = await this.createTxWithFunds({
       arrReceivers,
@@ -134,10 +135,10 @@ class CilUtils {
     };
 
     const tx = factory.Transaction.invokeContract(
-        this.stripAddressPrefix(strContractAddr),
-        contractCode,
-        0,
-        this._kpFunds.address
+      this.stripAddressPrefix(strContractAddr),
+      contractCode,
+      0,
+      this._kpFunds.address
     );
     tx.conciliumId = nConciliumId;
 
@@ -152,6 +153,7 @@ class CilUtils {
 
     return tx;
   }
+
   async createTxWithFunds({
                             arrCoins,
                             gatheredAmount,
@@ -168,7 +170,7 @@ class CilUtils {
       arrReceivers = [[strAddress, nAmountToSend]];
     }
 
-    if(!gatheredAmount){
+    if (!gatheredAmount) {
       gatheredAmount = arrCoins.reduce((accum, current) => accum + current.amount, 0);
     }
 
@@ -221,9 +223,10 @@ class CilUtils {
    * @param {Number} amount TO SEND (not including fees)
    * @param {Boolean} bUseOnlyOne - use one big output for payment (it will be last one!)
    * @param {Boolean} bBigFirst - use big outputs for first payment
+   * @param {Number} nOutputs - number of recipients (default 2: receiver + change)
    * @return {arrCoins, gathered}
    */
-  gatherInputsForAmount(arrUtxos, amount, bUseOnlyOne = false, bBigFirst = false) {
+  gatherInputsForAmount(arrUtxos, amount, bUseOnlyOne = false, bBigFirst = false, nOutputs = 2) {
     const arrCoins = [];
     let gathered = 0;
     if (bBigFirst) {
@@ -237,7 +240,7 @@ class CilUtils {
       if (bUseOnlyOne) {
         const fee = this._estimateTxFee(1, 2, true);
         if (coins.amount > amount + fee) return {arrCoins: [coins], gathered: coins.amount, skip: arrCoins.length};
-      } else if (gathered > amount + this._estimateTxFee(arrCoins.length, 2, true)) {
+      } else if (gathered > amount + this._estimateTxFee(arrCoins.length, nOutputs, true)) {
         return {
           arrCoins,
           gathered
@@ -257,7 +260,7 @@ class CilUtils {
    * @param {Number} nPage
    * @returns {Promise<*>} {hash, timestamp, inputs, outputs, value, spending}
    */
-  async getTXList (strAddress, nPage = 0){
+  async getTXList(strAddress, nPage = 0) {
     const strAddrToQuery = strAddress ? strAddress : this._kpFunds.address;
     const {txInfoDTOs} = await this.queryApi('Address', strAddrToQuery, {page: nPage});
     return txInfoDTOs;
@@ -269,7 +272,7 @@ class CilUtils {
    * @param {Number} nPage
    * @returns {Promise<*>} {transactionHash, symbol, from, to, quantity, timestamp}
    */
-  async getTokensTXList (strAddress, nPage = 0){
+  async getTokensTXList(strAddress, nPage = 0) {
     const strAddrToQuery = strAddress ? strAddress : this._kpFunds.address;
     return await this.queryApi('Token/Transactions', strAddrToQuery, {page: nPage});
   }
@@ -311,7 +314,7 @@ class CilUtils {
    */
   async isTxDoneExplorer(strTxHash, bContractCall) {
     const hasInternalTx = (objResult) => !!(objResult.tx.payload.outs.length &&
-        objResult.tx.payload.outs[0].intTx.length);
+                                            objResult.tx.payload.outs[0].intTx.length);
 
     try {
       const objResult = await this.queryApi('Transaction', strTxHash);
@@ -363,14 +366,14 @@ class CilUtils {
   stripAddressPrefix(strAddr) {
     const prefix = factory.Constants.ADDRESS_PREFIX;
     return strAddr.substring(0, 2) === prefix ?
-        strAddr.substring(prefix.length)
-        : strAddr;
+      strAddr.substring(prefix.length)
+      : strAddr;
   }
 
   async queryRpcMethod(strName, objParams) {
     const res = await this._client.request(
-        strName,
-        objParams
+      strName,
+      objParams
     );
     if (res.error) throw res.error;
     if (res.result) return res.result;
@@ -426,7 +429,7 @@ class CilUtils {
     }
   }
 
-  _getTransferFee (){
+  _getTransferFee() {
     return factory.Constants.fees.TX_FEE;
   }
 
@@ -474,6 +477,7 @@ class CilUtils {
       return false;
     }
   }
+
   /**
    *
    * @param {Object} contractCode
@@ -508,6 +512,7 @@ class CilUtils {
 
     return tx;
   }
+
   /**
    *
    * @param {String} sMethod
