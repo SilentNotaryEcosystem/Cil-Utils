@@ -1,7 +1,8 @@
 const assert = require('assert');
-const factory = require('chain-in-law');
 const commandLineArgs = require('command-line-args');
 const readline = require('readline');
+
+const factory = require('./factory');
 
 let {fundsPubKey} = readCmdLineOptions();
 
